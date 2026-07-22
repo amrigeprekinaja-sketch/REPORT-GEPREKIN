@@ -1,0 +1,67 @@
+*** QCRController.php
+@@
++    private function getQcrUangPlusLedgerStartDate(): string
++    {
++        return '2026-05-28';
++    }
++
+     private function getQcrUangPlusServerSaldo(array $outletIds, string $startDate, string $endDate, bool $lockForUpdate = false): float
+     {
+-        return (float) $this->getQcrUangPlusServerRows($outletIds, $startDate, $endDate, $lockForUpdate)
+-            ->sum(fn ($row) => (float) ($row->uang_plus ?? 0));
++        $ledgerStartDate = $this->getQcrUangPlusLedgerStartDate();
++
++        return (float) $this->getQcrUangPlusServerRows(
++            $outletIds,
++            $ledgerStartDate,
++            $endDate,
++            $lockForUpdate
++        )->sum(fn ($row) => (float) ($row->uang_plus ?? 0));
+     }
+@@ saveUangPlus
+-            $stockRows = $this->getQcrUangPlusServerRows($outletIds, $startDate, $endDate, true);
+-            $saldoServer = (float) $stockRows->sum(fn($row) => (float) ($row->uang_plus ?? 0));
++            $ledgerStartDate = $this->getQcrUangPlusLedgerStartDate();
++
++            $stockRows = $this->getQcrUangPlusServerRows(
++                $outletIds,
++                $ledgerStartDate,
++                $endDate,
++                true
++            );
++
++            $saldoServer = (float) $stockRows->sum(
++                fn ($row) => (float) ($row->uang_plus ?? 0)
++            );
+
+*** QcrControllerService.php
+@@
+-        // Saldo Uang Plus exact sesuai filter tanggal UI. Tidak ikut H+1.
+-        $uangPlusStockRows = $this->getQcrMergedStockRows(
+-            $outletIds,
+-            $start_date,
+-            $end_date,
+-            $isAllOutlet
+-        )->filter(function ($row) use ($start_date, $end_date) {
+-            if ((float) ($row->uang_plus ?? 0) <= 0) {
+-                return false;
+-            }
+-
+-            $tanggal = \Carbon\Carbon::parse($row->tanggal)->format('Y-m-d');
+-            return $tanggal >= $start_date && $tanggal <= $end_date;
+-        })->values();
+-
+-        $totalUangPlus = $this->sumQcrUangPlusSaldo($uangPlusStockRows);
++        $totalUangPlus = 0.0;
++
++        if (! $isAllOutlet && ! empty($outletIds)) {
++            $totalUangPlus = (float) $this->getQcrUangPlusServerSaldo(
++                $outletIds,
++                $start_date,
++                $end_date,
++                false
++            );
++        }
+
+# History tetap memakai:
+# ->whereBetween(DB::raw('DATE(t.sesi_tanggal)'), [$start_date, $end_date])
